@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta de Spools de Piping</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Consulta de Spools</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,24 +13,29 @@
     <div class="container">
         <header>
             <h1>🔍 Consulta de Spools</h1>
-            <p>Busca por ID o Spool. Escribe para ver sugerencias automáticas.</p>
+            <p>Busca por ID o Spool</p>
         </header>
 
         <div class="search-controls">
             <div class="control-group">
-                <label for="id-input">🔢 Buscar por ID_Item:</label>
+                <label for="id-input">🔢 ID_Item:</label>
                 <div class="search-wrapper">
-                    <input type="text" id="id-input" placeholder="Ej: 1, 2, 3..." autocomplete="off">
+                    <input type="text" id="id-input" placeholder="Ej: 1, 2, 3..." autocomplete="off" inputmode="numeric">
                     <div id="id-suggestions" class="suggestions"></div>
                 </div>
             </div>
             <div class="control-group">
-                <label for="spool-input">🔧 Buscar por Spool:</label>
+                <label for="spool-input">🔧 Spool:</label>
                 <div class="search-wrapper">
-                    <input type="text" id="spool-input" placeholder="Ej: 0907, SP01, BFW..." autocomplete="off">
+                    <input type="text" id="spool-input" placeholder="Ej: 0907, SP01..." autocomplete="off">
                     <div id="spool-suggestions" class="suggestions"></div>
                 </div>
             </div>
+        </div>
+
+        <!-- Botón para limpiar búsqueda en móvil -->
+        <div class="mobile-actions">
+            <button id="clear-search" class="btn-clear">🗑️ Limpiar</button>
         </div>
 
         <div id="loader" class="loader" style="display: none;">

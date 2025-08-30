@@ -15,41 +15,52 @@ document.addEventListener('DOMContentLoaded', () => {
     const spoolSuggestions = document.getElementById('spool-suggestions');
     const resultsContainer = document.getElementById('results-container');
     const loader = document.getElementById('loader');
+    const clearButton = document.getElementById('clear-search');
     
     let spoolsData = [];
     let filteredIds = [];
     let filteredSpools = [];
 
     /**
-     * Convierte URLs de Google Drive al formato correcto para visualización
+     * Convierte URLs de Google Drive a diferentes formatos según el tipo
      */
-    function fixGoogleDriveUrl(url) {
-        if (!url) return '';
+    function processGoogleDriveUrl(url, type = 'image') {
+        if (!url) return { viewUrl: '', downloadUrl: '', isValid: false };
         
-        // Extraer el ID del archivo de diferentes formatos de URL de Google Drive
+        // Extraer el ID del archivo
         let fileId = null;
         
-        // Formato: https://drive.google.com/file/d/ID/view
-        let match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (match) {
-            fileId = match[1];
-        }
+        // Diferentes patrones de URL de Google Drive
+        const patterns = [
+            /\/file\/d\/([a-zA-Z0-9_-]+)/,
+            /[?&]id=([a-zA-Z0-9_-]+)/,
+            /\/d\/([a-zA-Z0-9_-]+)/
+        ];
         
-        // Formato: https://drive.google.com/uc?export=view&id=ID
-        if (!fileId) {
-            match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
             if (match) {
                 fileId = match[1];
+                break;
             }
         }
         
-        // Si encontramos el ID, devolver la URL correcta para visualización
-        if (fileId) {
-            return `https://drive.google.com/uc?export=view&id=${fileId}`;
+        if (!fileId) {
+            return { viewUrl: url, downloadUrl: url, isValid: false };
         }
         
-        // Si no podemos extraer el ID, devolver la URL original
-        return url;
+        // URLs para diferentes propósitos
+        const viewUrl = `https://lh3.googleusercontent.com/d/${fileId}=s1000`; // Para imágenes
+        const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`; // Para descargar
+        const embedUrl = `https://drive.google.com/file/d/${fileId}/preview`; // Para preview
+        
+        return { 
+            viewUrl, 
+            downloadUrl, 
+            embedUrl,
+            fileId,
+            isValid: true 
+        };
     }
 
     /**
@@ -61,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Intentar primero sin proxy
         try {
-            console.log('Intentando acceso directo...');
+            console.log('🔄 Intentando acceso directo...');
             const directResponse = await fetch(`${JSON_URL_ORIGINAL}&t=${new Date().getTime()}`, {
                 method: 'GET',
                 mode: 'cors'
@@ -89,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Accept': 'application/json',
                         'Content-Type': 'application/json',
                     },
-                    signal: AbortSignal.timeout(10000)
+                    signal: AbortSignal.timeout(15000) // 15 segundos timeout
                 });
                 
                 if (!response.ok) {
@@ -135,20 +146,37 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('🔍 Inicializando búsqueda con', spoolsData.length, 'registros');
         
         // Limpiar los inputs
-        idInput.value = '';
-        spoolInput.value = '';
+        clearInputs();
         
-        // Mostrar mensaje de éxito
-        const successMsg = document.createElement('div');
-        successMsg.style.cssText = 'color: green; text-align: center; padding: 10px; margin: 10px 0; border: 1px solid green; border-radius: 4px; background-color: #f0fff0;';
-        successMsg.innerHTML = `✅ ${spoolsData.length} registros cargados correctamente. Puedes empezar a buscar.`;
-        resultsContainer.innerHTML = '';
-        resultsContainer.appendChild(successMsg);
+        // Mostrar mensaje de éxito temporal
+        showSuccessMessage(`✅ ${spoolsData.length} registros cargados. ¡Puedes empezar a buscar!`);
+    }
+
+    /**
+     * Muestra mensaje de éxito temporal
+     */
+    function showSuccessMessage(message) {
+        resultsContainer.innerHTML = `
+            <div style="color: green; text-align: center; padding: 1rem; margin: 1rem 0; border: 2px solid green; border-radius: 6px; background: linear-gradient(135deg, #d4edda, #c3e6cb); animation: fadeIn 0.5s;">
+                <strong>${message}</strong>
+            </div>
+        `;
         resultsContainer.style.display = 'block';
         
         setTimeout(() => {
             resultsContainer.style.display = 'none';
         }, 3000);
+    }
+
+    /**
+     * Limpia todos los inputs y sugerencias
+     */
+    function clearInputs() {
+        idInput.value = '';
+        spoolInput.value = '';
+        idSuggestions.style.display = 'none';
+        spoolSuggestions.style.display = 'none';
+        resultsContainer.style.display = 'none';
     }
 
     /**
@@ -162,17 +190,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filteredIds = spoolsData.filter(item => 
             item.ID_Item && item.ID_Item.toString().toLowerCase().includes(query.toLowerCase())
-        ).slice(0, 10); // Máximo 10 sugerencias
+        ).slice(0, 8); // Menos sugerencias en móvil
 
         if (filteredIds.length > 0) {
             idSuggestions.innerHTML = filteredIds.map(item => 
                 `<div class="suggestion-item" data-id="${item.ID_Item}">
-                    <strong>${item.ID_Item}</strong> - ${item.Spool || 'Sin spool'}
+                    <div>
+                        <strong>${item.ID_Item}</strong><br>
+                        <small>${item.Spool || 'Sin spool'}</small>
+                    </div>
                 </div>`
             ).join('');
             idSuggestions.style.display = 'block';
         } else {
-            idSuggestions.innerHTML = '<div class="suggestion-item no-results">No se encontraron coincidencias</div>';
+            idSuggestions.innerHTML = '<div class="suggestion-item no-results">❌ No hay coincidencias</div>';
             idSuggestions.style.display = 'block';
         }
     }
@@ -188,17 +219,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filteredSpools = spoolsData.filter(item => 
             item.Spool && item.Spool.toString().toLowerCase().includes(query.toLowerCase())
-        ).slice(0, 10); // Máximo 10 sugerencias
+        ).slice(0, 8); // Menos sugerencias en móvil
 
         if (filteredSpools.length > 0) {
             spoolSuggestions.innerHTML = filteredSpools.map(item => 
                 `<div class="suggestion-item" data-id="${item.ID_Item}">
-                    <strong>${item.Spool}</strong> - ID: ${item.ID_Item}
+                    <div>
+                        <strong>${item.Spool}</strong><br>
+                        <small>ID: ${item.ID_Item}</small>
+                    </div>
                 </div>`
             ).join('');
             spoolSuggestions.style.display = 'block';
         } else {
-            spoolSuggestions.innerHTML = '<div class="suggestion-item no-results">No se encontraron coincidencias</div>';
+            spoolSuggestions.innerHTML = '<div class="suggestion-item no-results">❌ No hay coincidencias</div>';
             spoolSuggestions.style.display = 'block';
         }
     }
@@ -217,62 +251,84 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedItem) {
             console.log('📋 Mostrando item:', selectedItem);
             
-            // Limpiar y procesar el status
+            // Procesar status
             const rawStatus = selectedItem.Status || 'Sin estado';
             const cleanStatus = rawStatus.toString().trim();
             const statusClass = `status-${cleanStatus.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
             
-            // Arreglar URLs de Google Drive
-            const fotoUrl = fixGoogleDriveUrl(selectedItem.Foto_URL);
-            const planoUrl = fixGoogleDriveUrl(selectedItem.Plano_URL);
+            // Procesar URLs
+            const fotoInfo = processGoogleDriveUrl(selectedItem.Foto_URL, 'image');
+            const planoInfo = processGoogleDriveUrl(selectedItem.Plano_URL, 'pdf');
             
-            console.log('🖼️ URL foto original:', selectedItem.Foto_URL);
-            console.log('🖼️ URL foto corregida:', fotoUrl);
-            console.log('📄 URL plano original:', selectedItem.Plano_URL);
-            console.log('📄 URL plano corregida:', planoUrl);
+            console.log('🖼️ Info foto:', fotoInfo);
+            console.log('📄 Info plano:', planoInfo);
             
-            // Determinar si el plano es PDF
-            const isPdf = planoUrl.toLowerCase().includes('.pdf') || 
-                         selectedItem.Plano_URL.toLowerCase().includes('.pdf');
+            // HTML para la foto
+            const fotoHtml = fotoInfo.isValid ? 
+                `<img src="${fotoInfo.viewUrl}" alt="Foto del Spool ${selectedItem.Spool}" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                 <div class="error-message" style="display: none;">
+                     📷 Imagen no disponible<br>
+                     <small>Puede que el archivo no sea público</small>
+                 </div>` :
+                `<div class="error-message">📷 URL de imagen no válida</div>`;
             
-            const planViewerHtml = planoUrl ? (isPdf 
-                ? `<iframe src="${planoUrl}" title="Visor de Plano PDF" style="width: 100%; height: 600px; border: 1px solid #dee2e6; border-radius: 4px;"></iframe>`
-                : `<img src="${planoUrl}" alt="Plano Isométrico" style="width: 100%; height: auto; max-height: 600px; border: 1px solid #dee2e6; border-radius: 4px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                   <div style="display: none; text-align: center; padding: 40px; border: 1px solid #dee2e6; border-radius: 4px; background-color: #f8f9fa; color: #6c757d;">
-                       ❌ No se pudo cargar el plano<br><small>URL: ${planoUrl}</small>
-                   </div>`) : '<p style="text-align: center; color: #6c757d; padding: 40px; border: 1px solid #dee2e6; border-radius: 4px; background-color: #f8f9fa;">📄 No hay plano disponible</p>';
+            // HTML para el plano (botón de descarga)
+            const planoHtml = planoInfo.isValid ? 
+                `<div class="plan-actions">
+                     <a href="${planoInfo.downloadUrl}" class="btn-download" target="_blank" rel="noopener">
+                         📥 Descargar PDF
+                     </a>
+                     <small style="color: var(--secondary-color); text-align: center; margin-top: 0.5rem;">
+                         Se abrirá en una nueva ventana
+                     </small>
+                 </div>` :
+                `<div class="error-message">📄 No hay plano disponible</div>`;
 
             resultsContainer.innerHTML = `
                 <div class="result-card">
                     <div class="result-photo">
-                        <img src="${fotoUrl}" alt="Foto del Spool ${selectedItem.Spool}" 
-                             style="width: 100%; height: auto; border-radius: 4px; object-fit: cover;"
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        <div style="display: none; text-align: center; padding: 40px; border: 1px solid #dee2e6; border-radius: 4px; background-color: #f8f9fa; color: #6c757d;">
-                            📷 Foto no disponible<br><small>URL: ${fotoUrl}</small>
-                        </div>
+                        ${fotoHtml}
                     </div>
                     <div class="result-details">
-                        <h2>Spool: ${selectedItem.Spool || 'Sin identificar'}</h2>
+                        <h2>${selectedItem.Spool || 'Sin identificar'}</h2>
                         <div class="detail-item">
-                            <strong>Status:</strong> 
-                            <span class="status-badge ${statusClass}" title="Estado: ${cleanStatus}">
+                            <strong>📊 Status:</strong>
+                            <span class="status-badge ${statusClass}">
                                 ${cleanStatus}
                             </span>
                         </div>
-                        <div class="detail-item"><strong>Ubicación:</strong> ${selectedItem.Ubicacion || 'No especificada'}</div>
-                        <div class="detail-item"><strong>ID:</strong> ${selectedItem.ID_Item}</div>
+                        <div class="detail-item">
+                            <strong>📍 Ubicación:</strong>
+                            <span>${selectedItem.Ubicacion || 'No especificada'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>🔢 ID:</strong>
+                            <span>${selectedItem.ID_Item}</span>
+                        </div>
                     </div>
                 </div>
                 <div class="plan-viewer">
                     <h3>📋 Plano Isométrico</h3>
-                    ${planViewerHtml}
+                    ${planoHtml}
                 </div>
             `;
+            
             resultsContainer.style.display = 'block';
+            
+            // Scroll suave al resultado en móviles
+            if (window.innerWidth <= 768) {
+                setTimeout(() => {
+                    resultsContainer.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start' 
+                    });
+                }, 100);
+            }
+            
         } else {
             resultsContainer.innerHTML = `
-                <div style="color: red; text-align: center; padding: 20px; border: 1px solid red; border-radius: 4px; background-color: #fff5f5;">
+                <div class="error-message">
                     <h3>❌ Item no encontrado</h3>
                     <p>No se pudo encontrar el item con ID: ${selectedId}</p>
                 </div>
@@ -286,13 +342,13 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function showError(errorMessage) {
         resultsContainer.innerHTML = `
-            <div style="color: red; padding: 20px; border: 1px solid red; border-radius: 4px; background-color: #fff5f5; margin: 20px 0;">
-                <h3>❌ Error al cargar los datos</h3>
+            <div style="color: red; padding: 1rem; border: 2px solid red; border-radius: 6px; background-color: #fff5f5; margin: 1rem 0;">
+                <h3>❌ Error</h3>
                 <p><strong>Mensaje:</strong> ${errorMessage}</p>
                 
-                <details style="margin-top: 15px;">
+                <details style="margin-top: 1rem;">
                     <summary style="cursor: pointer; font-weight: bold;">🔍 Información técnica</summary>
-                    <div style="margin-top: 10px; font-size: 0.9em;">
+                    <div style="margin-top: 0.5rem; font-size: 0.9em;">
                         <p><strong>URL original:</strong> ${JSON_URL_ORIGINAL}</p>
                         <p><strong>Proxies probados:</strong></p>
                         <ul>
@@ -301,26 +357,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </details>
                 
-                <div style="margin-top: 15px;">
+                <div style="margin-top: 1rem; text-align: center;">
                     <button onclick="location.reload()" 
-                            style="margin-right: 10px; padding: 8px 16px; background: #007BFF; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            style="margin: 0.5rem; padding: 0.8rem 1.5rem; background: #007BFF; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 44px;">
                         🔄 Intentar de nuevo
                     </button>
-                    <button onclick="window.open('${JSON_URL_ORIGINAL}', '_blank')" 
-                            style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                        🔗 Abrir archivo JSON
-                    </button>
+                    <br>
+                    <a href="${JSON_URL_ORIGINAL}" target="_blank"
+                       style="display: inline-block; margin: 0.5rem; padding: 0.8rem 1.5rem; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; min-height: 44px;">
+                        🔗 Ver archivo JSON
+                    </a>
                 </div>
             </div>
         `;
         resultsContainer.style.display = 'block';
     }
 
-    // Event Listeners
+    // Event Listeners optimizados para móvil
+    let searchTimeout;
+
     idInput.addEventListener('input', (e) => {
-        spoolInput.value = ''; // Limpiar el otro campo
+        clearTimeout(searchTimeout);
+        spoolInput.value = '';
         spoolSuggestions.style.display = 'none';
-        filterIds(e.target.value);
+        
+        searchTimeout = setTimeout(() => {
+            filterIds(e.target.value);
+        }, 300); // Debounce para mejor performance
         
         if (!e.target.value) {
             resultsContainer.style.display = 'none';
@@ -328,19 +391,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     spoolInput.addEventListener('input', (e) => {
-        idInput.value = ''; // Limpiar el otro campo
+        clearTimeout(searchTimeout);
+        idInput.value = '';
         idSuggestions.style.display = 'none';
-        filterSpools(e.target.value);
+        
+        searchTimeout = setTimeout(() => {
+            filterSpools(e.target.value);
+        }, 300); // Debounce para mejor performance
         
         if (!e.target.value) {
             resultsContainer.style.display = 'none';
         }
     });
 
-    // Click en sugerencias
+    // Prevenir zoom en iOS cuando se hace focus en input
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        idInput.addEventListener('focus', preventZoom);
+        spoolInput.addEventListener('focus', preventZoom);
+        
+        function preventZoom() {
+            document.querySelector('meta[name=viewport]').setAttribute(
+                'content', 
+                'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
+            );
+        }
+    }
+
+    // Click en sugerencias con mejor manejo táctil
     document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('suggestion-item') && e.target.dataset.id) {
-            const selectedId = e.target.dataset.id;
+        if (e.target.closest('.suggestion-item') && e.target.closest('.suggestion-item').dataset.id) {
+            const selectedId = e.target.closest('.suggestion-item').dataset.id;
             displayResult(selectedId);
             
             // Ocultar sugerencias
@@ -360,6 +440,39 @@ document.addEventListener('DOMContentLoaded', () => {
             spoolSuggestions.style.display = 'none';
         }
     });
+
+    // Botón limpiar
+    clearButton.addEventListener('click', () => {
+        clearInputs();
+        showSuccessMessage('🗑️ Búsqueda limpiada. Puedes buscar de nuevo.');
+    });
+
+    // Manejo de teclado virtual en móviles
+    let initialViewportHeight = window.innerHeight;
+    
+    window.addEventListener('resize', () => {
+        // Detectar si el teclado virtual está abierto
+        const currentHeight = window.innerHeight;
+        const keyboardOpen = currentHeight < initialViewportHeight * 0.8;
+        
+        if (keyboardOpen) {
+            document.body.style.height = `${currentHeight}px`;
+            // Reducir altura de sugerencias cuando el teclado está abierto
+            document.documentElement.style.setProperty('--suggestion-max-height', '30vh');
+        } else {
+            document.body.style.height = 'auto';
+            document.documentElement.style.setProperty('--suggestion-max-height', '60vh');
+        }
+    });
+
+    // Prevenir scroll del body cuando se scrollea en sugerencias
+    idSuggestions.addEventListener('touchmove', (e) => {
+        e.stopPropagation();
+    }, { passive: true });
+    
+    spoolSuggestions.addEventListener('touchmove', (e) => {
+        e.stopPropagation();
+    }, { passive: true });
 
     // Carga inicial de datos
     fetchData().finally(() => {
