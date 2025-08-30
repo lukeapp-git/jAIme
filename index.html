@@ -12,29 +12,34 @@
 <body>
     <div class="container">
         <header>
-            <h1>Consulta de Spools</h1>
-            <p>Selecciona un criterio de búsqueda para ver los detalles.</p>
+            <h1>🔍 Consulta de Spools</h1>
+            <p>Busca por ID o Spool. Escribe para ver sugerencias automáticas.</p>
         </header>
 
         <div class="search-controls">
             <div class="control-group">
-                <label for="id-selector">Buscar por ID_Item:</label>
-                <select id="id-selector">
-                    <option value="">Selecciona un ID...</option>
-                </select>
+                <label for="id-input">🔢 Buscar por ID_Item:</label>
+                <div class="search-wrapper">
+                    <input type="text" id="id-input" placeholder="Ej: 1, 2, 3..." autocomplete="off">
+                    <div id="id-suggestions" class="suggestions"></div>
+                </div>
             </div>
             <div class="control-group">
-                <label for="spool-selector">Buscar por Spool:</label>
-                <select id="spool-selector">
-                    <option value="">Selecciona un Spool...</option>
-                </select>
+                <label for="spool-input">🔧 Buscar por Spool:</label>
+                <div class="search-wrapper">
+                    <input type="text" id="spool-input" placeholder="Ej: 0907, SP01, BFW..." autocomplete="off">
+                    <div id="spool-suggestions" class="suggestions"></div>
+                </div>
             </div>
         </div>
 
-        <div id="loader" class="loader" style="display: none;"></div>
+        <div id="loader" class="loader" style="display: none;">
+            <div class="spinner"></div>
+            <p>Cargando datos...</p>
+        </div>
         
         <div id="results-container" class="results-container" style="display: none;">
-            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>

@@ -8,7 +8,9 @@
     --success-color: #28a745;
     --warning-color: #ffc107;
     --info-color: #17a2b8;
+    --danger-color: #dc3545;
     --box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    --suggestion-shadow: 0 2px 10px rgba(0,0,0,0.15);
 }
 
 body {
@@ -38,6 +40,12 @@ header {
 
 header h1 {
     color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+header p {
+    color: var(--secondary-color);
+    margin: 0;
 }
 
 .search-controls {
@@ -50,38 +58,107 @@ header h1 {
 .control-group {
     flex: 1;
     min-width: 250px;
+    position: relative;
 }
 
 label {
     display: block;
     margin-bottom: 0.5rem;
     font-weight: 500;
+    color: var(--text-color);
 }
 
-select {
+.search-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+input[type="text"] {
     width: 100%;
     padding: 0.75rem;
     font-size: 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
     background-color: #fff;
-    transition: border-color 0.2s;
+    transition: all 0.2s;
+    box-sizing: border-box;
 }
 
-select:focus {
+input[type="text"]:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
+input[type="text"]:hover {
+    border-color: var(--primary-color);
+}
+
+/* Sugerencias de búsqueda */
+.suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: var(--suggestion-shadow);
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+.suggestion-item {
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s;
+}
+
+.suggestion-item:hover {
+    background-color: #f8f9fa;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item.no-results {
+    color: var(--secondary-color);
+    cursor: default;
+    font-style: italic;
+}
+
+.suggestion-item.no-results:hover {
+    background-color: transparent;
+}
+
+.suggestion-item strong {
+    color: var(--primary-color);
+}
+
+/* Loader mejorado */
 .loader {
+    text-align: center;
+    padding: 2rem;
+}
+
+.spinner {
     border: 4px solid #f3f3f3;
     border-top: 4px solid var(--primary-color);
     border-radius: 50%;
     width: 40px;
     height: 40px;
     animation: spin 1s linear infinite;
-    margin: 2rem auto;
+    margin: 0 auto 1rem;
+}
+
+.loader p {
+    color: var(--secondary-color);
+    margin: 0;
 }
 
 @keyframes spin {
@@ -101,6 +178,7 @@ select:focus {
     padding: 1.5rem;
     background-color: #fff;
     flex-wrap: wrap;
+    margin-bottom: 2rem;
 }
 
 .result-photo {
@@ -113,6 +191,7 @@ select:focus {
     height: auto;
     border-radius: 4px;
     object-fit: cover;
+    max-height: 300px;
 }
 
 .result-details {
@@ -123,60 +202,157 @@ select:focus {
 .result-details h2 {
     margin-top: 0;
     color: var(--primary-color);
+    font-size: 1.5rem;
 }
 
 .detail-item {
     margin-bottom: 1rem;
     font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .detail-item strong {
     color: var(--secondary-color);
     display: inline-block;
     width: 100px;
+    margin-right: 10px;
 }
 
+/* Status badges mejorados */
 .status-badge {
-    padding: 0.3em 0.8em;
-    border-radius: 12px;
+    padding: 0.4em 0.8em;
+    border-radius: 20px;
     font-weight: 700;
     color: #fff;
-    font-size: 0.9em;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-block;
+    margin-left: 5px;
 }
 
-.status-fabricado { background-color: var(--info-color); }
-.status-en-taller { background-color: var(--warning-color); color: #333; }
-.status-montado { background-color: var(--success-color); }
+/* Estilos específicos para diferentes estados */
+.status-0-8-montaje { 
+    background: linear-gradient(135deg, var(--success-color), #20c997);
+}
 
+.status-fabricado { 
+    background: linear-gradient(135deg, var(--info-color), #0dcaf0);
+}
+
+.status-en-taller { 
+    background: linear-gradient(135deg, var(--warning-color), #fd7e14);
+    color: #333;
+}
+
+.status-montado { 
+    background: linear-gradient(135deg, var(--success-color), #20c997);
+}
+
+.status-sin-estado {
+    background: linear-gradient(135deg, var(--secondary-color), #adb5bd);
+}
+
+/* Plan viewer */
 .plan-viewer {
     margin-top: 2rem;
-    border-top: 1px solid var(--border-color);
+    border-top: 2px solid var(--border-color);
     padding-top: 1.5rem;
 }
 
 .plan-viewer h3 {
     text-align: center;
     color: var(--secondary-color);
+    margin-bottom: 1rem;
 }
 
 .plan-viewer iframe, .plan-viewer img {
     width: 100%;
-    height: 600px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
+    display: block;
 }
 
+.plan-viewer iframe {
+    height: 600px;
+}
+
+/* Animaciones */
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { 
+        opacity: 0; 
+        transform: translateY(10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.suggestions {
+    animation: slideIn 0.2s ease-out;
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
         padding: 1rem;
+        margin: 10px;
     }
-    .search-controls, .result-card {
+    
+    .search-controls {
         flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .result-card {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .detail-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .detail-item strong {
+        width: auto;
+        margin-right: 0;
+        margin-bottom: 0.25rem;
+    }
+    
+    .plan-viewer iframe {
+        height: 400px;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        padding: 10px;
+    }
+    
+    .container {
+        padding: 1rem;
+    }
+    
+    header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .suggestions {
+        max-height: 200px;
     }
 }

@@ -9,21 +9,57 @@ const CORS_PROXIES = [
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
-    const idSelector = document.getElementById('id-selector');
-    const spoolSelector = document.getElementById('spool-selector');
+    const idInput = document.getElementById('id-input');
+    const spoolInput = document.getElementById('spool-input');
+    const idSuggestions = document.getElementById('id-suggestions');
+    const spoolSuggestions = document.getElementById('spool-suggestions');
     const resultsContainer = document.getElementById('results-container');
     const loader = document.getElementById('loader');
     
     let spoolsData = [];
+    let filteredIds = [];
+    let filteredSpools = [];
 
     /**
-     * Carga los datos usando proxies CORS y puebla los selectores.
+     * Convierte URLs de Google Drive al formato correcto para visualización
+     */
+    function fixGoogleDriveUrl(url) {
+        if (!url) return '';
+        
+        // Extraer el ID del archivo de diferentes formatos de URL de Google Drive
+        let fileId = null;
+        
+        // Formato: https://drive.google.com/file/d/ID/view
+        let match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (match) {
+            fileId = match[1];
+        }
+        
+        // Formato: https://drive.google.com/uc?export=view&id=ID
+        if (!fileId) {
+            match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+            if (match) {
+                fileId = match[1];
+            }
+        }
+        
+        // Si encontramos el ID, devolver la URL correcta para visualización
+        if (fileId) {
+            return `https://drive.google.com/uc?export=view&id=${fileId}`;
+        }
+        
+        // Si no podemos extraer el ID, devolver la URL original
+        return url;
+    }
+
+    /**
+     * Carga los datos usando proxies CORS
      */
     async function fetchData() {
         loader.style.display = 'block';
         resultsContainer.style.display = 'none';
         
-        // Intentar primero sin proxy (por si Google Drive permite el acceso)
+        // Intentar primero sin proxy
         try {
             console.log('Intentando acceso directo...');
             const directResponse = await fetch(`${JSON_URL_ORIGINAL}&t=${new Date().getTime()}`, {
@@ -33,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (directResponse.ok) {
                 spoolsData = await directResponse.json();
-                populateSelectors(spoolsData);
+                initializeSearchInputs();
                 console.log('✅ Acceso directo exitoso');
                 return;
             }
@@ -42,8 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Si el acceso directo falla, probar con proxies
-        let lastError = null;
-        
         for (let i = 0; i < CORS_PROXIES.length; i++) {
             try {
                 const proxyUrl = CORS_PROXIES[i] + encodeURIComponent(JSON_URL_ORIGINAL + '&t=' + new Date().getTime());
@@ -55,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Accept': 'application/json',
                         'Content-Type': 'application/json',
                     },
-                    // Timeout de 10 segundos
                     signal: AbortSignal.timeout(10000)
                 });
                 
@@ -65,27 +98,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const responseText = await response.text();
                 
-                // Verificar que la respuesta sea JSON válido
                 try {
                     spoolsData = JSON.parse(responseText);
                 } catch (parseError) {
                     throw new Error('La respuesta no es JSON válido');
                 }
                 
-                // Verificar que sea un array con datos
                 if (!Array.isArray(spoolsData) || spoolsData.length === 0) {
                     throw new Error('Los datos no tienen el formato esperado');
                 }
                 
-                populateSelectors(spoolsData);
+                initializeSearchInputs();
                 console.log(`✅ Proxy ${i + 1} funcionó correctamente`);
-                return; // Salir si funciona
+                console.log(`📊 ${spoolsData.length} registros cargados`);
+                return;
                 
             } catch (error) {
-                lastError = error;
                 console.warn(`❌ Proxy ${i + 1} falló:`, error.message);
                 
-                // Si es el último proxy, mostrar error
                 if (i === CORS_PROXIES.length - 1) {
                     showError(`Todos los métodos fallaron. Último error: ${error.message}`);
                 }
@@ -94,7 +124,165 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Muestra un mensaje de error detallado
+     * Inicializa los inputs de búsqueda
+     */
+    function initializeSearchInputs() {
+        if (!Array.isArray(spoolsData) || spoolsData.length === 0) {
+            showError('No hay datos disponibles');
+            return;
+        }
+
+        console.log('🔍 Inicializando búsqueda con', spoolsData.length, 'registros');
+        
+        // Limpiar los inputs
+        idInput.value = '';
+        spoolInput.value = '';
+        
+        // Mostrar mensaje de éxito
+        const successMsg = document.createElement('div');
+        successMsg.style.cssText = 'color: green; text-align: center; padding: 10px; margin: 10px 0; border: 1px solid green; border-radius: 4px; background-color: #f0fff0;';
+        successMsg.innerHTML = `✅ ${spoolsData.length} registros cargados correctamente. Puedes empezar a buscar.`;
+        resultsContainer.innerHTML = '';
+        resultsContainer.appendChild(successMsg);
+        resultsContainer.style.display = 'block';
+        
+        setTimeout(() => {
+            resultsContainer.style.display = 'none';
+        }, 3000);
+    }
+
+    /**
+     * Filtra y muestra sugerencias para IDs
+     */
+    function filterIds(query) {
+        if (!query || query.length < 1) {
+            idSuggestions.style.display = 'none';
+            return;
+        }
+
+        filteredIds = spoolsData.filter(item => 
+            item.ID_Item && item.ID_Item.toString().toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 10); // Máximo 10 sugerencias
+
+        if (filteredIds.length > 0) {
+            idSuggestions.innerHTML = filteredIds.map(item => 
+                `<div class="suggestion-item" data-id="${item.ID_Item}">
+                    <strong>${item.ID_Item}</strong> - ${item.Spool || 'Sin spool'}
+                </div>`
+            ).join('');
+            idSuggestions.style.display = 'block';
+        } else {
+            idSuggestions.innerHTML = '<div class="suggestion-item no-results">No se encontraron coincidencias</div>';
+            idSuggestions.style.display = 'block';
+        }
+    }
+
+    /**
+     * Filtra y muestra sugerencias para Spools
+     */
+    function filterSpools(query) {
+        if (!query || query.length < 1) {
+            spoolSuggestions.style.display = 'none';
+            return;
+        }
+
+        filteredSpools = spoolsData.filter(item => 
+            item.Spool && item.Spool.toString().toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 10); // Máximo 10 sugerencias
+
+        if (filteredSpools.length > 0) {
+            spoolSuggestions.innerHTML = filteredSpools.map(item => 
+                `<div class="suggestion-item" data-id="${item.ID_Item}">
+                    <strong>${item.Spool}</strong> - ID: ${item.ID_Item}
+                </div>`
+            ).join('');
+            spoolSuggestions.style.display = 'block';
+        } else {
+            spoolSuggestions.innerHTML = '<div class="suggestion-item no-results">No se encontraron coincidencias</div>';
+            spoolSuggestions.style.display = 'block';
+        }
+    }
+
+    /**
+     * Muestra el resultado seleccionado
+     */
+    function displayResult(selectedId) {
+        if (!selectedId) {
+            resultsContainer.style.display = 'none';
+            return;
+        }
+
+        const selectedItem = spoolsData.find(item => item.ID_Item.toString() === selectedId.toString());
+
+        if (selectedItem) {
+            console.log('📋 Mostrando item:', selectedItem);
+            
+            // Limpiar y procesar el status
+            const rawStatus = selectedItem.Status || 'Sin estado';
+            const cleanStatus = rawStatus.toString().trim();
+            const statusClass = `status-${cleanStatus.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+            
+            // Arreglar URLs de Google Drive
+            const fotoUrl = fixGoogleDriveUrl(selectedItem.Foto_URL);
+            const planoUrl = fixGoogleDriveUrl(selectedItem.Plano_URL);
+            
+            console.log('🖼️ URL foto original:', selectedItem.Foto_URL);
+            console.log('🖼️ URL foto corregida:', fotoUrl);
+            console.log('📄 URL plano original:', selectedItem.Plano_URL);
+            console.log('📄 URL plano corregida:', planoUrl);
+            
+            // Determinar si el plano es PDF
+            const isPdf = planoUrl.toLowerCase().includes('.pdf') || 
+                         selectedItem.Plano_URL.toLowerCase().includes('.pdf');
+            
+            const planViewerHtml = planoUrl ? (isPdf 
+                ? `<iframe src="${planoUrl}" title="Visor de Plano PDF" style="width: 100%; height: 600px; border: 1px solid #dee2e6; border-radius: 4px;"></iframe>`
+                : `<img src="${planoUrl}" alt="Plano Isométrico" style="width: 100%; height: auto; max-height: 600px; border: 1px solid #dee2e6; border-radius: 4px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                   <div style="display: none; text-align: center; padding: 40px; border: 1px solid #dee2e6; border-radius: 4px; background-color: #f8f9fa; color: #6c757d;">
+                       ❌ No se pudo cargar el plano<br><small>URL: ${planoUrl}</small>
+                   </div>`) : '<p style="text-align: center; color: #6c757d; padding: 40px; border: 1px solid #dee2e6; border-radius: 4px; background-color: #f8f9fa;">📄 No hay plano disponible</p>';
+
+            resultsContainer.innerHTML = `
+                <div class="result-card">
+                    <div class="result-photo">
+                        <img src="${fotoUrl}" alt="Foto del Spool ${selectedItem.Spool}" 
+                             style="width: 100%; height: auto; border-radius: 4px; object-fit: cover;"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div style="display: none; text-align: center; padding: 40px; border: 1px solid #dee2e6; border-radius: 4px; background-color: #f8f9fa; color: #6c757d;">
+                            📷 Foto no disponible<br><small>URL: ${fotoUrl}</small>
+                        </div>
+                    </div>
+                    <div class="result-details">
+                        <h2>Spool: ${selectedItem.Spool || 'Sin identificar'}</h2>
+                        <div class="detail-item">
+                            <strong>Status:</strong> 
+                            <span class="status-badge ${statusClass}" title="Estado: ${cleanStatus}">
+                                ${cleanStatus}
+                            </span>
+                        </div>
+                        <div class="detail-item"><strong>Ubicación:</strong> ${selectedItem.Ubicacion || 'No especificada'}</div>
+                        <div class="detail-item"><strong>ID:</strong> ${selectedItem.ID_Item}</div>
+                    </div>
+                </div>
+                <div class="plan-viewer">
+                    <h3>📋 Plano Isométrico</h3>
+                    ${planViewerHtml}
+                </div>
+            `;
+            resultsContainer.style.display = 'block';
+        } else {
+            resultsContainer.innerHTML = `
+                <div style="color: red; text-align: center; padding: 20px; border: 1px solid red; border-radius: 4px; background-color: #fff5f5;">
+                    <h3>❌ Item no encontrado</h3>
+                    <p>No se pudo encontrar el item con ID: ${selectedId}</p>
+                </div>
+            `;
+            resultsContainer.style.display = 'block';
+        }
+    }
+
+    /**
+     * Muestra mensaje de error
      */
     function showError(errorMessage) {
         resultsContainer.innerHTML = `
@@ -128,109 +316,49 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.style.display = 'block';
     }
 
-    /**
-     * Llena los <select> con las opciones de ID y Spool.
-     * @param {Array} data - El array de objetos de los spools.
-     */
-    function populateSelectors(data) {
-        if (!Array.isArray(data) || data.length === 0) {
-            resultsContainer.innerHTML = `
-                <div style="color: orange; text-align: center; padding: 20px; border: 1px solid orange; border-radius: 4px; background-color: #fff9e6;">
-                    <h3>⚠️ No hay datos disponibles</h3>
-                    <p>El archivo JSON está vacío o no contiene datos válidos.</p>
-                </div>
-            `;
-            resultsContainer.style.display = 'block';
-            return;
-        }
-
-        // Limpiar selectores existentes
-        idSelector.innerHTML = '<option value="">Selecciona un ID...</option>';
-        spoolSelector.innerHTML = '<option value="">Selecciona un Spool...</option>';
-
-        data.forEach(item => {
-            // Verificar que el item tenga las propiedades necesarias
-            if (!item.ID_Item || !item.Spool) {
-                console.warn('Item sin ID_Item o Spool:', item);
-                return;
-            }
-
-            // Poblar selector de ID_Item
-            const idOption = document.createElement('option');
-            idOption.value = item.ID_Item;
-            idOption.textContent = item.ID_Item;
-            idSelector.appendChild(idOption);
-
-            // Poblar selector de Spool
-            const spoolOption = document.createElement('option');
-            spoolOption.value = item.ID_Item;
-            spoolOption.textContent = item.Spool;
-            spoolSelector.appendChild(spoolOption);
-        });
-
-        console.log(`✅ ${data.length} elementos cargados en los selectores`);
-    }
-
-    /**
-     * Muestra el resultado seleccionado en la interfaz.
-     * @param {string} selectedId - El ID_Item del spool a mostrar.
-     */
-    function displayResult(selectedId) {
-        if (!selectedId) {
+    // Event Listeners
+    idInput.addEventListener('input', (e) => {
+        spoolInput.value = ''; // Limpiar el otro campo
+        spoolSuggestions.style.display = 'none';
+        filterIds(e.target.value);
+        
+        if (!e.target.value) {
             resultsContainer.style.display = 'none';
-            return;
         }
-
-        const selectedItem = spoolsData.find(item => item.ID_Item.toString() === selectedId.toString());
-
-        if (selectedItem) {
-            const statusClass = `status-${selectedItem.Status.toLowerCase().replace(/\s+/g, '-')}`;
-            
-            // Determinar si el plano es PDF o imagen
-            const isPdf = selectedItem.Plano_URL && selectedItem.Plano_URL.toLowerCase().includes('.pdf');
-            const planViewerHtml = isPdf 
-                ? `<iframe src="${selectedItem.Plano_URL}" title="Visor de Plano PDF" style="width: 100%; height: 600px; border: 1px solid #dee2e6; border-radius: 4px;"></iframe>`
-                : `<img src="${selectedItem.Plano_URL}" alt="Plano Isométrico" style="width: 100%; height: auto; border: 1px solid #dee2e6; border-radius: 4px;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIiBzdHJva2U9IiNkZWUyZTYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2IiBmaWxsPSIjNmM3NTdkIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+UGxhbm8gbm8gZGlzcG9uaWJsZTwvdGV4dD48L3N2Zz4=';">`;
-
-            resultsContainer.innerHTML = `
-                <div class="result-card">
-                    <div class="result-photo">
-                        <img src="${selectedItem.Foto_URL}" alt="Foto del Spool ${selectedItem.Spool}" 
-                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjhmOWZhIiBzdHJva2U9IiNkZWUyZTYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNmM3NTdkIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Rm90byBubyBkaXNwb25pYmxlPC90ZXh0Pjwvc3ZnPg==';">
-                    </div>
-                    <div class="result-details">
-                        <h2>Spool: ${selectedItem.Spool}</h2>
-                        <div class="detail-item"><strong>Status:</strong> <span class="status-badge ${statusClass}">${selectedItem.Status}</span></div>
-                        <div class="detail-item"><strong>Ubicación:</strong> ${selectedItem.Ubicacion || 'No especificada'}</div>
-                        <div class="detail-item"><strong>ID:</strong> ${selectedItem.ID_Item}</div>
-                    </div>
-                </div>
-                <div class="plan-viewer">
-                    <h3>Plano Isométrico</h3>
-                    ${selectedItem.Plano_URL ? planViewerHtml : '<p style="text-align: center; color: #6c757d;">No hay plano disponible</p>'}
-                </div>
-            `;
-            resultsContainer.style.display = 'block';
-        } else {
-            resultsContainer.innerHTML = `
-                <div style="color: red; text-align: center; padding: 20px; border: 1px solid red; border-radius: 4px; background-color: #fff5f5;">
-                    <h3>❌ Item no encontrado</h3>
-                    <p>No se pudo encontrar el item con ID: ${selectedId}</p>
-                </div>
-            `;
-            resultsContainer.style.display = 'block';
-        }
-    }
-
-    // Event Listeners para los selectores
-    idSelector.addEventListener('change', (e) => {
-        spoolSelector.value = ""; // Resetea el otro selector
-        displayResult(e.target.value);
     });
 
-    spoolSelector.addEventListener('change', (e) => {
-        idSelector.value = ""; // Resetea el otro selector
-        displayResult(e.target.value);
+    spoolInput.addEventListener('input', (e) => {
+        idInput.value = ''; // Limpiar el otro campo
+        idSuggestions.style.display = 'none';
+        filterSpools(e.target.value);
+        
+        if (!e.target.value) {
+            resultsContainer.style.display = 'none';
+        }
+    });
+
+    // Click en sugerencias
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('suggestion-item') && e.target.dataset.id) {
+            const selectedId = e.target.dataset.id;
+            displayResult(selectedId);
+            
+            // Ocultar sugerencias
+            idSuggestions.style.display = 'none';
+            spoolSuggestions.style.display = 'none';
+            
+            // Actualizar el input correspondiente
+            if (e.target.closest('#id-suggestions')) {
+                idInput.value = selectedId;
+            } else if (e.target.closest('#spool-suggestions')) {
+                const item = spoolsData.find(item => item.ID_Item.toString() === selectedId);
+                spoolInput.value = item ? item.Spool : selectedId;
+            }
+        } else if (!e.target.closest('.search-controls')) {
+            // Ocultar sugerencias si se hace click fuera
+            idSuggestions.style.display = 'none';
+            spoolSuggestions.style.display = 'none';
+        }
     });
 
     // Carga inicial de datos
