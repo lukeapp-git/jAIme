@@ -64,6 +64,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Abre imagen en modal/nueva ventana
+     */
+    function openImageModal(imageUrl, title) {
+        // Crear modal
+        const modal = document.createElement('div');
+        modal.className = 'image-modal';
+        modal.innerHTML = `
+            <div class="modal-backdrop" onclick="this.parentElement.remove()"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>${title}</h3>
+                    <button class="modal-close" onclick="this.closest('.image-modal').remove()">×</button>
+                </div>
+                <div class="modal-body">
+                    <img src="${imageUrl}" alt="${title}" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Prevenir scroll del body cuando el modal está abierto
+        document.body.style.overflow = 'hidden';
+        
+        // Remover modal al hacer click fuera o ESC
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal || e.target.className === 'modal-backdrop') {
+                modal.remove();
+                document.body.style.overflow = 'auto';
+            }
+        });
+        
+        document.addEventListener('keydown', function escapeHandler(e) {
+            if (e.key === 'Escape') {
+                modal.remove();
+                document.body.style.overflow = 'auto';
+                document.removeEventListener('keydown', escapeHandler);
+            }
+        });
+    }
+
+    /**
      * Carga los datos usando proxies CORS
      */
     async function fetchData() {
@@ -251,27 +293,41 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedItem) {
             console.log('📋 Mostrando item:', selectedItem);
             
-            // Procesar status
-            const rawStatus = selectedItem.Status || 'Sin estado';
-            const cleanStatus = rawStatus.toString().trim();
-            const statusClass = `status-${cleanStatus.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-            
-            // Procesar URLs
+            // Procesar URLs para imagen principal y imagen origen
             const fotoInfo = processGoogleDriveUrl(selectedItem.Foto_URL, 'image');
+            const fotoOrigenInfo = processGoogleDriveUrl(selectedItem.Foto_URL_Origen, 'image');
             const planoInfo = processGoogleDriveUrl(selectedItem.Plano_URL, 'pdf');
             
             console.log('🖼️ Info foto:', fotoInfo);
+            console.log('🖼️ Info foto origen:', fotoOrigenInfo);
             console.log('📄 Info plano:', planoInfo);
             
-            // HTML para la foto
-            const fotoHtml = fotoInfo.isValid ? 
-                `<img src="${fotoInfo.viewUrl}" alt="Foto del Spool ${selectedItem.Spool}" 
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                 <div class="error-message" style="display: none;">
-                     📷 Imagen no disponible<br>
-                     <small>Puede que el archivo no sea público</small>
-                 </div>` :
-                `<div class="error-message">📷 URL de imagen no válida</div>`;
+            // HTML para la foto principal (clickable si hay imagen origen)
+            let fotoHtml = '';
+            if (fotoInfo.isValid) {
+                const clickableClass = fotoOrigenInfo.isValid ? 'clickable-image' : '';
+                const clickHandler = fotoOrigenInfo.isValid ? 
+                    `onclick="openImageModal('${fotoOrigenInfo.viewUrl}', 'Imagen Original - ${selectedItem.Spool || 'Spool'}')"` : '';
+                const clickHint = fotoOrigenInfo.isValid ? 
+                    '<div class="click-hint">🔍 Click para ver imagen original</div>' : '';
+                
+                fotoHtml = `
+                    <div class="image-wrapper">
+                        <img src="${fotoInfo.viewUrl}" 
+                             alt="Foto del Spool ${selectedItem.Spool}" 
+                             class="${clickableClass}"
+                             ${clickHandler}
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div class="error-message" style="display: none;">
+                            📷 Imagen no disponible<br>
+                            <small>Puede que el archivo no sea público</small>
+                        </div>
+                        ${clickHint}
+                    </div>
+                `;
+            } else {
+                fotoHtml = `<div class="error-message">📷 URL de imagen no válida</div>`;
+            }
             
             // HTML para el plano (botón de descarga)
             const planoHtml = planoInfo.isValid ? 
@@ -285,6 +341,10 @@ document.addEventListener('DOMContentLoaded', () => {
                  </div>` :
                 `<div class="error-message">📄 No hay plano disponible</div>`;
 
+            // Procesar status - mostrar exactamente lo que viene en el JSON sin estilos
+            const rawStatus = selectedItem.Status || 'Sin estado';
+            const displayStatus = rawStatus.toString().trim();
+
             resultsContainer.innerHTML = `
                 <div class="result-card">
                     <div class="result-photo">
@@ -294,9 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <h2>${selectedItem.Spool || 'Sin identificar'}</h2>
                         <div class="detail-item">
                             <strong>📊 Status:</strong>
-                            <span class="status-badge ${statusClass}">
-                                ${cleanStatus}
-                            </span>
+                            <span class="status-text">${displayStatus}</span>
                         </div>
                         <div class="detail-item">
                             <strong>📍 Ubicación:</strong>
@@ -315,6 +373,9 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             
             resultsContainer.style.display = 'block';
+            
+            // Hacer disponible la función openImageModal globalmente para este contexto
+            window.openImageModal = openImageModal;
             
             // Scroll suave al resultado en móviles
             if (window.innerWidth <= 768) {

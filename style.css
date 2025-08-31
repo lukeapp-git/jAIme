@@ -215,12 +215,138 @@ input[type="text"]:focus {
     margin-bottom: 1rem;
 }
 
+/* Imagen clickable y wrapper */
+.image-wrapper {
+    position: relative;
+    width: 100%;
+}
+
 .result-photo img {
     width: 100%;
     height: auto;
     border-radius: 4px;
     object-fit: cover;
     max-height: px;
+    transition: transform 0.2s ease;
+}
+
+.clickable-image {
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+.clickable-image:hover {
+    transform: scale(1.02);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.click-hint {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 0.3rem 0.6rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    opacity: 0.9;
+    transition: opacity 0.2s;
+}
+
+.clickable-image:hover + .click-hint,
+.image-wrapper:hover .click-hint {
+    opacity: 1;
+}
+
+/* Modal para imagen ampliada */
+.image-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(3px);
+}
+
+.modal-content {
+    position: relative;
+    background: white;
+    border-radius: 8px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    animation: slideIn 0.3s ease;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--surface-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 1.1rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+    min-height: 40px;
+    min-width: 40px;
+}
+
+.modal-close:hover {
+    background: var(--border-color);
+}
+
+.modal-body {
+    padding: 1rem;
+    text-align: center;
+    max-height: calc(90vh - 80px);
+    overflow: auto;
+}
+
+.modal-body img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 4px;
+}
+
+@keyframes slideIn {
+    from {
+        transform: scale(0.9) translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
 }
 
 .result-details {
@@ -250,38 +376,16 @@ input[type="text"]:focus {
     font-size: 0.9rem;
 }
 
-/* Status badges móvil */
-.status-badge {
-    padding: 0.4em 0.8em;
-    border-radius: 15px;
-    font-weight: 700;
-    color: #fff;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
+/* Status simplificado - sin estilos específicos */
+.status-text {
+    padding: 0.3rem 0.6rem;
+    background-color: var(--border-color);
+    color: var(--text-color);
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 0.9rem;
     display: inline-block;
     margin-top: 0.2rem;
-}
-
-.status-0-8-montaje { 
-    background: linear-gradient(135deg, var(--success-color), #20c997);
-}
-
-.status-fabricado { 
-    background: linear-gradient(135deg, var(--info-color), #0dcaf0);
-}
-
-.status-en-taller { 
-    background: linear-gradient(135deg, var(--warning-color), #fd7e14);
-    color: #333;
-}
-
-.status-montado { 
-    background: linear-gradient(135deg, var(--success-color), #20c997);
-}
-
-.status-sin-estado {
-    background: linear-gradient(135deg, var(--secondary-color), #adb5bd);
 }
 
 /* Plan viewer móvil */
@@ -393,6 +497,11 @@ input[type="text"]:focus {
     .result-details h2 {
         font-size: 1.4rem;
     }
+    
+    .modal-content {
+        max-width: 80vw;
+        max-height: 85vh;
+    }
 }
 
 @media (min-width: 768px) {
@@ -439,6 +548,15 @@ input[type="text"]:focus {
     .mobile-actions {
         display: none;
     }
+    
+    .modal-content {
+        max-width: 70vw;
+        max-height: 80vh;
+    }
+    
+    .result-photo img {
+        max-height: 300px;
+    }
 }
 
 @media (min-width: 992px) {
@@ -455,6 +573,11 @@ input[type="text"]:focus {
         width: auto;
         min-width: 200px;
     }
+    
+    .modal-content {
+        max-width: 60vw;
+        max-height: 75vh;
+    }
 }
 
 /* Mejoras de accesibilidad táctil */
@@ -467,6 +590,16 @@ input[type="text"]:focus {
         background-color: var(--primary-color);
         color: white;
     }
+    
+    .clickable-image:hover {
+        transform: none;
+        border-color: transparent;
+        box-shadow: none;
+    }
+    
+    .click-hint {
+        opacity: 1;
+    }
 }
 
 /* Orientación landscape en móviles */
@@ -477,5 +610,9 @@ input[type="text"]:focus {
     
     .result-photo img {
         max-height: 150px;
+    }
+    
+    .modal-content {
+        max-height: 95vh;
     }
 }
