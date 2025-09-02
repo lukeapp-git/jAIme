@@ -74,15 +74,16 @@
             color: var(--text-color);
         }
 
-        input[type="password"] {
+        input[type="password"], input[type="url"] {
             padding: 12px;
             font-size: 1rem;
             border: 2px solid var(--border-color);
             border-radius: 6px;
             transition: border-color 0.3s;
+            width: 100%;
         }
 
-        input[type="password"]:focus {
+        input[type="password"]:focus, input[type="url"]:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
@@ -132,6 +133,15 @@
 
         .btn-warning:hover {
             background-color: #e0a800;
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #218838;
         }
 
         button:disabled {
@@ -212,6 +222,7 @@
             margin: 0.5rem 0;
             font-family: monospace;
             font-size: 0.9rem;
+            word-break: break-all;
         }
 
         .spinner {
@@ -250,6 +261,21 @@
             background-color: var(--secondary-color);
         }
 
+        .url-input-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-end;
+        }
+
+        .url-input-group input {
+            flex: 1;
+        }
+
+        .url-input-group button {
+            min-width: auto;
+            padding: 12px 16px;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
@@ -262,6 +288,11 @@
             
             button {
                 min-width: 100%;
+            }
+
+            .url-input-group {
+                flex-direction: column;
+                align-items: stretch;
             }
         }
     </style>
@@ -287,6 +318,17 @@
 
         <div class="admin-panel">
             <div class="control-group">
+                <label for="script-url">🔗 URL del Script de Google Apps:</label>
+                <div class="url-input-group">
+                    <input type="url" id="script-url" placeholder="https://script.google.com/macros/s/...">
+                    <button id="update-url-btn" class="btn-success">✅ Usar</button>
+                </div>
+                <small style="color: var(--secondary-color); margin-top: 0.5rem;">
+                    Si el script no responde, pega aquí la nueva URL desplegada
+                </small>
+            </div>
+
+            <div class="control-group">
                 <label for="password">🔐 Contraseña de Administrador:</label>
                 <input type="password" id="password" placeholder="Ingresa la contraseña única">
             </div>
@@ -309,15 +351,17 @@
     </div>
 
     <script>
-        // ⚠️ CONFIGURACIÓN - ¡VERIFICAR ESTOS VALORES!
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZzw5BB_KGVBgYmgRX20q2HlcSahOeBEr0DddFMCBKB_APp5_H-qqM1kMtbbgG-vXM6w/exec';
+        // ⚠️ CONFIGURACIÓN INICIAL - Se puede modificar desde la interfaz
+        let APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwhzNrWnxqRubb42SNS6SJcFAvE4EYlwQQ5a8Gb6MC5jGDcTEEnuXJjpWaIq5K8xQXS9w/exec';
         const ADMIN_PASSWORD = 'Narkis2025';
 
         document.addEventListener('DOMContentLoaded', () => {
             const updateButton = document.getElementById('force-update-btn');
             const testButton = document.getElementById('test-connection-btn');
             const debugButton = document.getElementById('debug-btn');
+            const updateUrlButton = document.getElementById('update-url-btn');
             const passwordInput = document.getElementById('password');
+            const scriptUrlInput = document.getElementById('script-url');
             const feedbackMessage = document.getElementById('feedback-message');
             const currentUrlSpan = document.getElementById('current-url');
             const scriptStatusSpan = document.getElementById('script-status');
@@ -325,6 +369,7 @@
 
             // Mostrar URL actual
             currentUrlSpan.textContent = APPS_SCRIPT_URL;
+            scriptUrlInput.value = APPS_SCRIPT_URL;
 
             // Verificar estado del script al cargar
             checkScriptStatus();
@@ -333,16 +378,38 @@
             testButton.addEventListener('click', testConnection);
             updateButton.addEventListener('click', forceUpdate);
             debugButton.addEventListener('click', runDiagnostics);
+            updateUrlButton.addEventListener('click', updateScriptUrl);
+
+            function updateScriptUrl() {
+                const newUrl = scriptUrlInput.value.trim();
+                if (!newUrl) {
+                    displayFeedback('❌ Por favor ingresa una URL válida', 'error');
+                    return;
+                }
+
+                if (!newUrl.includes('script.google.com/macros/s/')) {
+                    displayFeedback('❌ La URL no parece ser de Google Apps Script', 'error');
+                    return;
+                }
+
+                APPS_SCRIPT_URL = newUrl;
+                currentUrlSpan.textContent = newUrl;
+                displayFeedback('✅ URL actualizada correctamente', 'success');
+                
+                // Verificar nueva URL automáticamente
+                setTimeout(checkScriptStatus, 1000);
+            }
 
             async function checkScriptStatus() {
                 try {
-                    const response = await fetch(APPS_SCRIPT_URL + '?action=ping', {
+                    const response = await fetch(APPS_SCRIPT_URL + '?action=ping&t=' + new Date().getTime(), {
                         method: 'GET',
                         mode: 'cors'
                     });
                     
                     if (response.ok) {
-                        updateScriptStatus(true, 'Online - Script accesible');
+                        const result = await response.json();
+                        updateScriptStatus(true, `Online - ${result.message || 'Script accesible'}`);
                     } else {
                         updateScriptStatus(false, `Error HTTP ${response.status}`);
                     }
@@ -373,7 +440,7 @@
                     testResults.push('✅ Iniciando pruebas de conexión...');
                     
                     const startTime = Date.now();
-                    const response = await fetch(APPS_SCRIPT_URL, {
+                    const response = await fetch(APPS_SCRIPT_URL + '?action=ping&t=' + new Date().getTime(), {
                         method: 'GET',
                         mode: 'cors',
                         headers: {
@@ -385,7 +452,6 @@
 
                     testResults.push(`📡 Respuesta recibida en ${endTime - startTime}ms`);
                     testResults.push(`🌐 Status HTTP: ${response.status} ${response.statusText}`);
-                    testResults.push(`📋 Headers: ${JSON.stringify(Object.fromEntries(response.headers))}`);
 
                     if (response.ok) {
                         const responseText = await response.text();
@@ -395,6 +461,14 @@
                             const jsonData = JSON.parse(responseText);
                             testResults.push(`✅ JSON válido recibido`);
                             testResults.push(`🔍 Estructura: ${JSON.stringify(jsonData, null, 2)}`);
+                            
+                            // Prueba adicional: obtener datos
+                            const dataTest = await fetch(APPS_SCRIPT_URL + '?action=getData&t=' + new Date().getTime());
+                            if (dataTest.ok) {
+                                const dataResult = await dataTest.json();
+                                testResults.push(`📊 Datos disponibles: ${dataResult.recordCount || 0} registros`);
+                            }
+                            
                         } catch (parseError) {
                             testResults.push(`⚠️ La respuesta no es JSON válido: ${parseError.message}`);
                         }
@@ -410,7 +484,6 @@
                 } catch (error) {
                     testResults.push(`❌ Error de conexión: ${error.message}`);
                     testResults.push(`🔧 Tipo de error: ${error.name}`);
-                    testResults.push(`📍 Stack trace: ${error.stack}`);
                     
                     displayFeedback(`❌ Error de conexión: ${error.message}`, 'error');
                     updateScriptStatus(false, error.message);
@@ -451,23 +524,38 @@
                     });
 
                     const endTime = Date.now();
-                    const responseText = await response.text();
-
-                    if (response.ok) {
-                        try {
-                            const result = JSON.parse(responseText);
-                            
-                            if (result.status === 'success') {
-                                displayFeedback(`✅ Actualización exitosa (${endTime - startTime}ms)`, 'success');
-                                updateScriptStatus(true, 'Actualizado exitosamente');
-                            } else {
-                                throw new Error(result.message || 'Error desconocido en el script');
-                            }
-                        } catch (parseError) {
-                            displayFeedback(`⚠️ Respuesta inesperada del servidor: ${responseText}`, 'warning');
-                        }
-                    } else {
+                    
+                    if (!response.ok) {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const responseText = await response.text();
+                    
+                    try {
+                        const result = JSON.parse(responseText);
+                        
+                        if (result.status === 'success') {
+                            displayFeedback(`✅ Actualización exitosa (${endTime - startTime}ms) - ${result.recordCount} registros`, 'success');
+                            updateScriptStatus(true, 'Actualizado exitosamente');
+                            
+                            // Mostrar información adicional
+                            debugContent.innerHTML = `
+                                <h4>✅ Última Actualización Exitosa</h4>
+                                <div class="debug-item">🕒 Timestamp: ${result.timestamp}</div>
+                                <div class="debug-item">📊 Registros procesados: ${result.recordCount}</div>
+                                <div class="debug-item">📋 Headers: ${result.headers ? result.headers.join(', ') : 'No disponible'}</div>
+                                <div class="debug-item">🔗 Archivo: ${result.fileUrl || 'URL no disponible'}</div>
+                            `;
+                        } else {
+                            throw new Error(result.message || 'Error desconocido en el script');
+                        }
+                    } catch (parseError) {
+                        // Si no es JSON, mostrar la respuesta tal como viene
+                        if (responseText.includes('success') || responseText.includes('actualizado')) {
+                            displayFeedback(`✅ Actualización completada (${endTime - startTime}ms)`, 'success');
+                        } else {
+                            displayFeedback(`⚠️ Respuesta inesperada del servidor: ${responseText.substring(0, 200)}`, 'warning');
+                        }
                     }
 
                 } catch (error) {
@@ -494,7 +582,7 @@
                     // Verificación de CORS
                     diagnostics.push(`🔒 Modo CORS: Habilitado`);
                     
-                    // Prueba de red
+                    // Prueba de red general
                     try {
                         const networkTest = await fetch('https://httpbin.org/get');
                         diagnostics.push(`🌍 Conectividad general: ✅ OK (${networkTest.status})`);
@@ -502,15 +590,31 @@
                         diagnostics.push(`🌍 Conectividad general: ❌ Error (${netError.message})`);
                     }
 
-                    // Prueba específica del script
+                    // Prueba específica del script - Ping
                     try {
-                        const scriptTest = await fetch(APPS_SCRIPT_URL + '?test=1');
-                        diagnostics.push(`📜 Script accesible: ✅ OK (${scriptTest.status})`);
+                        const pingTest = await fetch(APPS_SCRIPT_URL + '?action=ping&t=' + new Date().getTime());
+                        diagnostics.push(`📜 Script Ping: ✅ OK (${pingTest.status})`);
                         
-                        const scriptResponse = await scriptTest.text();
-                        diagnostics.push(`📋 Respuesta del script: ${scriptResponse.substring(0, 300)}...`);
+                        if (pingTest.ok) {
+                            const pingResponse = await pingTest.json();
+                            diagnostics.push(`📋 Respuesta Ping: ${JSON.stringify(pingResponse)}`);
+                        }
                     } catch (scriptError) {
-                        diagnostics.push(`📜 Script accesible: ❌ Error (${scriptError.message})`);
+                        diagnostics.push(`📜 Script Ping: ❌ Error (${scriptError.message})`);
+                    }
+
+                    // Prueba de obtención de datos
+                    try {
+                        const dataTest = await fetch(APPS_SCRIPT_URL + '?action=getData&t=' + new Date().getTime());
+                        diagnostics.push(`📊 Datos del script: ✅ OK (${dataTest.status})`);
+                        
+                        if (dataTest.ok) {
+                            const dataResponse = await dataTest.json();
+                            diagnostics.push(`📈 Registros disponibles: ${dataResponse.recordCount || 0}`);
+                            diagnostics.push(`📋 Headers: ${dataResponse.headers ? dataResponse.headers.join(', ') : 'No disponible'}`);
+                        }
+                    } catch (dataError) {
+                        diagnostics.push(`📊 Datos del script: ❌ Error (${dataError.message})`);
                     }
 
                     // Verificación de la configuración
@@ -535,13 +639,26 @@
                         • Verifica que la URL del Apps Script sea correcta<br>
                         • Asegúrate de que el script esté desplegado como "acceso público"<br>
                         • Revisa que no haya errores en el código del Apps Script<br>
-                        • Intenta redesplegar el script con una nueva URL
+                        • Intenta redesplegar el script con una nueva URL<br>
+                        • Verifica que las funciones doGet() y doPost() estén implementadas
                     </div>
                     <div class="debug-item">
                         <strong>Si el script no responde:</strong><br>
                         • Verifica los logs del Apps Script en Google Cloud Console<br>
                         • Asegúrate de que la función doGet() o doPost() esté implementada<br>
-                        • Revisa los permisos de Google Sheets/Drive
+                        • Revisa los permisos de Google Sheets/Drive<br>
+                        • Verifica que el FOLDER_ID y SHEET_NAME sean correctos
+                    </div>
+                    <div class="debug-item">
+                        <strong>Para redesplegar el script:</strong><br>
+                        • Ve a script.google.com<br>
+                        • Abre tu proyecto<br>
+                        • Haz clic en "Implementar" > "Nueva implementación"<br>
+                        • Selecciona "Aplicación web"<br>
+                        • Cambia la versión a "Nueva"<br>
+                        • Asegúrate de que "Ejecutar como" sea "Yo"<br>
+                        • Y "Quién tiene acceso" sea "Cualquier usuario"<br>
+                        • Copia la nueva URL y úsala arriba
                     </div>
                 `;
 
