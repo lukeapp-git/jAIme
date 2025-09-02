@@ -367,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="plan-viewer">
-                    <h3>📋 Plano Isométrico</h3>
+                    <h3>📋 Revisión Actual - ${selectedItem['REVISION ACTUAL'] || 'No especificada'}</h3>
                     ${planoHtml}
                 </div>
             `;
