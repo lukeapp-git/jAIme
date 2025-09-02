@@ -1,6 +1,6 @@
 // ------------------------------------------------------------------------------------------
 // CONFIGURACIÓN ACTUALIZADA - ¡NUEVA URL DE IMPLEMENTACIÓN!
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwhzNrWnxqRubb42SNS6SJcFAvE4EYlwQQ5a8Gb6MC5jGDcTEEnuXJjpWaIq5K8xQXS9w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw5JQJ6N9dWZtvjLNosOZO3oq7KmSUUT32q6PbT7-z57ZRmDP_nbh1BxuA7sL-9i1a6fQ/exec';
 const ADMIN_PASSWORD = 'Narkis2025'; // Cambia esta contraseña si es necesario
 // ------------------------------------------------------------------------------------------
 
